@@ -56,16 +56,47 @@
     self.videoLayer = [[AVCaptureVideoPreviewLayer alloc] initWithSession:self.session];
     [self.videoLayer setVideoGravity:AVLayerVideoGravityResizeAspectFill];
     [self.videoLayer setFrame:self.viewController.view.layer.bounds];
-    [self.viewController.view.layer addSublayer:self.videoLayer];
     
+    UIView* video = [self createVideoView];
+    self.videoLayer.zPosition = 0.0;
+    [video.layer insertSublayer:self.videoLayer atIndex:0];
+    [self.viewController.view addSubview:video];
     
     return YES;
+}
+
+-(UIView*) createVideoView {
+    CGRect bounds = self.viewController.view.layer.bounds;
+    CGFloat btnHeight = 50.0f;
+    UIView* videoView = [[UIView alloc] initWithFrame:bounds];
+    
+    UIButton* cancel = [[UIButton alloc] initWithFrame:CGRectMake(0.0, bounds.size.height-btnHeight, bounds.size.width, btnHeight)];
+    [cancel setTitleColor:videoView.tintColor forState:UIControlStateNormal];
+    [cancel setTitle:@"Cancel" forState:UIControlStateNormal];
+    [cancel setBackgroundColor:[UIColor colorWithWhite:1.0 alpha:1.0]];
+    cancel.layer.zPosition = 5.0;
+    
+    [cancel addTarget:self action:@selector(cancelScan) forControlEvents:UIControlEventTouchUpInside];
+    
+    [videoView addSubview:cancel];
+    
+    return videoView;
+}
+
+-(void) cancelScan {
+    [self stopReading];
+    [self returnSuccessScanResult:@"" OrCancelled:@1];
 }
 
 -(void) stopReading {
     [self.session stopRunning];
     self.session = nil;
     
+    for (UIView* subView in self.viewController.view.subviews) {
+        if (![subView isKindOfClass:[UIWebView class]]) {
+            [subView removeFromSuperview];
+        }
+    }
     [self.videoLayer removeFromSuperlayer];
 }
 
@@ -86,15 +117,19 @@
 }
 
 -(void) returnSuccessScanResult:(NSString*) result {
-    if (self.callbackId != nil) {
-        CDVPluginResult * scanResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:result];
-        [self.commandDelegate sendPluginResult:scanResult callbackId:self.callbackId];
-    }
+    [self returnSuccessScanResult:result OrCancelled:@0];
 }
 
 -(void) returnFailureMessage:(NSString*) error {
     if (self.callbackId != nil) {
         CDVPluginResult* scanResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:error];
+        [self.commandDelegate sendPluginResult:scanResult callbackId:self.callbackId];
+    }
+}
+
+-(void) returnSuccessScanResult:(NSString* )result OrCancelled:(NSNumber*)cancelled {
+    if (self.callbackId != nil ) {
+        CDVPluginResult* scanResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:@{@"cancelled":cancelled, @"text":result}];
         [self.commandDelegate sendPluginResult:scanResult callbackId:self.callbackId];
     }
 }
